@@ -4,8 +4,10 @@ import uuid
 from datetime import datetime
 
 s3 = boto3.client("s3")
+dynamodb = boto3.client("dynamodb")
 
 BUCKET_NAME = "smartdocs-ai-347152105990"
+TABLE_NAME = "smartdocs-documents"
 EXPIRY_SECONDS = 300  # 5 minutes
 
 
@@ -24,6 +26,35 @@ def lambda_handler(event, context):
         count_characters = body.get("count_characters")
         count_words = body.get("count_words")
         s3_key = body.get("s3_key")  # caller provides this for character count
+        
+        if count_characters or count_words:
+            if not s3_key:
+                return response(400, {"error": "s3_key is required for counting"})
+            if not s3_key.endswith(".txt"):
+                return response(400, {"error": "only .txt files are supported"})
+            try:
+                obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
+                text = obj["Body"].read().decode("utf-8")
+                timestamp = datetime.utcnow().strftime("%Y/%m/%d")
+                item = dynamodb.put_item(
+                TableName = TABLE_NAME,
+                Item={
+                    "doc_id": {"S": str(uuid.uuid4())},
+                    "char_count": {"N": str(len(text))},
+                    "word_count": {"N": str(len(text.split()))},
+                    "timestamp": {"S": timestamp}
+                }
+                )
+                if count_characters: 
+                    return response(200, {"s3_key": s3_key, "character_count": len(text)})
+                else: 
+                    return response(404, {"error": "file not found in S3"})
+                if count_words:
+                    return response(200, {"s3_key": s3_key, "word_count": len(text.split())})       
+                else: 
+                    return response(404, {"error": "file not found in S3"})             
+            except s3.exceptions.NoSuchKey:
+                return response(404, {"error": "key not found in S3"})
 
         # --- Action: count characters in an existing S3 .txt file ---
         if count_characters:
@@ -49,6 +80,17 @@ def lambda_handler(event, context):
             try: 
                 obj = s3.get_object(Bucket=BUCKET_NAME, Key=s3_key)
                 text = obj["Body"].read().decode("utf-8")
+                timestamp = datetime.utcnow().strftime("%Y/%m/%d")
+                item = dynamodb.put_item(
+                    TableName = TABLE_NAME,
+                    Item={
+                        "doc_id": {"S": str(uuid.uuid4())},
+                        "word_count": {"N": str(len(text.split()))},
+                        "char_count": {"N": str(len(text))},
+                        "timestamp": {"S": timestamp},
+                        "s3_key": {"S": s3_key}
+                    }
+                )
                 return response(200, {"s3_key": s3_key, "word_count": len(text.split())})
             except s3.exceptions.NoSuchKey:
                 return response(404, {"error": "file not found in S3"})
