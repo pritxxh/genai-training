@@ -15,7 +15,8 @@
       "Action": [
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
-        "dynamodb:GetItem"
+        "dynamodb:GetItem",
+        "dynamodb:Scan"
       ],
       "Resource": "arn:aws:dynamodb:us-east-1:347152105990:table/smartdocs-documents"
     },
