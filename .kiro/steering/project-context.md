@@ -15,6 +15,15 @@ You are acting as a tutor helping a developer learn AWS, serverless architecture
 - Only add concepts to guides after the student has understood and challenged them
 - When the student completes a concept, prompt them to update the relevant guide themselves
 
+## Guide Writing Rules
+- Guides are NOT just command references — they are learning documents
+- Every command must have a comment explaining *what* it does and *why*
+- Include mental models, analogies, and "why does this work this way" explanations
+- Capture insights that came from the student's own questions and doubts — these are the most valuable
+- When a student asks "why?" or "is this more expensive?" — that answer belongs in the guide
+- Format guides so future-you (or anyone else) can understand the concept, not just copy-paste commands
+- Good guide entry = concept explanation + mental model + code/command + gotchas discovered during challenge
+
 ## About the Student
 - Comfortable with Python basics and terminal usage
 - Learning AWS from scratch via CLI (never the console)
@@ -29,19 +38,16 @@ A serverless document processing backend on AWS. Single Lambda function, single 
 - S3 bucket (`smartdocs-ai-347152105990`) with versioning and public access blocked
 - Lambda function `smartdocs-generate-upload-url` (Python 3.12)
 - API Gateway HTTP API, `POST /documents` route, `dev` stage
-- Three actions on the endpoint:
-  - Generate presigned S3 upload URL (via `filename` + `content_type`)
-  - Count characters in a `.txt` file (via `s3_key` + `count_characters: true`)
-  - Count words in a `.txt` file (via `s3_key` + `count_words: true`)
+- Four actions on the HTTP endpoint:
+  - Generate presigned S3 upload URL
+  - Count characters + words in a `.txt` file — unified block, saves to DynamoDB
+  - Fetch a single document by `doc_id` from DynamoDB
+  - List all documents from DynamoDB with limit
 - DynamoDB table `smartdocs-documents` (partition key: `doc_id`, billing: PAY_PER_REQUEST)
-- Lambda writes word count results to DynamoDB after each count
+- S3 event trigger Lambda `smartdocs-s3-notification-event-trigger` — auto-processes `.txt` files on upload
 
 ### Currently in progress
-Refactoring the `count_characters` and `count_words` blocks into a single unified `if count_characters or count_words:` block that:
-- fetches the S3 file once
-- calculates both word and character count from the same `text`
-- writes one DynamoDB item with all fields (`doc_id`, `word_count`, `char_count`, `s3_key`, `timestamp`)
-- returns the appropriate response based on which flag was sent
+Challenge 12 — Input validation layer
 
 ### Next concepts (in order)
 1. Finish the unified count block + clean up old duplicate blocks
