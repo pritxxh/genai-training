@@ -118,6 +118,19 @@ Spot on. One small fix — API Gateway doesn't send "raw response body from Dyna
 
 ---
 
-## Concepts Still to Answer
+## Q7 — Why keep S3 trigger and API Gateway handler as separate Lambda functions?
 
-- Q7: Why keep the S3 trigger and API Gateway handler as separate Lambda functions?
+**Answer given:**
+Both have different response structures. API Gateway uses raw HTTP JSON via curl/fetch. S3 triggers use `Records` array. Mixing them could cause the function to misinterpret between `record["s3"]["bucket"]["name"]` and `body.get("s3_key")` — fine at small scale but risky at enterprise scale.
+
+**Correct — plus three more reasons:**
+
+1. **Different event structures** — you'd need `if "Records" in event` checks everywhere, adding complexity and misrouting risk. Exactly as described.
+
+2. **Different response requirements** — API Gateway Lambda *must* return `{"statusCode": 200, "body": "..."}`. S3 trigger Lambda returns nothing (`None`). Mixing forces conditional return formats.
+
+3. **Different IAM needs** — S3 trigger only needs S3 read + DynamoDB write. HTTP handler needs S3 read/write + DynamoDB read/write + presigned URL generation. Separate functions = separate roles = least privilege. Tighter security.
+
+4. **Operational clarity** — when something breaks, you check one function's CloudWatch logs with a clear purpose. A combined function makes debugging harder — you'd have to figure out which path failed.
+
+Rule of thumb: one Lambda function = one responsibility = one trigger type.
