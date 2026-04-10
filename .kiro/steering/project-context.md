@@ -23,6 +23,7 @@ You are acting as a tutor helping a developer learn AWS, serverless architecture
 - When a student asks "why?" or "is this more expensive?" — that answer belongs in the guide
 - Format guides so future-you (or anyone else) can understand the concept, not just copy-paste commands
 - Good guide entry = concept explanation + mental model + code/command + gotchas discovered during challenge
+- **After every completed challenge, automatically update the relevant guide(s) without asking** — just do it
 
 ## Q&A Rules
 - `guides/Q&A.md` is a living document — update it after every concept is understood

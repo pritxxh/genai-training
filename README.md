@@ -62,10 +62,12 @@ This is the full arc — from CLI basics to production Gen-AI pipelines.
 - [x] S3 — buckets, objects, presigned URLs
 - [x] Lambda — serverless functions, packaging, deploying
 - [x] API Gateway — HTTP APIs, routes, integrations, stages
-- [ ] DynamoDB — tables, items, partition keys, sort keys
-- [ ] DynamoDB advanced — queries, GSI, scan vs query
-- [ ] S3 event triggers — auto-invoke Lambda on upload
+- [x] DynamoDB — tables, items, partition keys, put/get/scan, TypeDeserializer
+- [x] S3 event triggers — auto-invoke Lambda on upload
+- [x] Input validation layer — shared modules, action routing, handle_* pattern
+- [x] Deploy scripts — deploy.sh, set -e, zip structure
 - [ ] CloudWatch — structured logging, metrics, alarms
+- [ ] DynamoDB advanced — queries, GSI, scan vs query
 
 ### Gen-AI on AWS
 - [ ] AWS Bedrock — invoking foundation models (Claude, Titan, etc.)

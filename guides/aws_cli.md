@@ -113,3 +113,77 @@ Key concepts:
 - Presigned URL = a temporary, cryptographically signed URL that lets anyone upload/download without AWS credentials. Expires after N seconds.
 
 `aws s3 cp` is for developers with credentials. Presigned URLs are for end users with no credentials.
+
+---
+
+## SNS — Simple Notification Service
+
+SNS is AWS's pub/sub messaging service. An alarm, Lambda, or any AWS service can publish to an SNS topic, and all subscribers (email, SMS, Lambda, SQS) receive the message.
+
+Think of it like a group chat — one message sent to the topic, everyone subscribed gets it.
+
+```bash
+# Create a topic — returns a TopicArn, save it
+aws sns create-topic --name smartdocs-lambda-alerts --region us-east-1
+
+# Subscribe an email address to the topic
+# AWS sends a confirmation email — you MUST click it before notifications work
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:347152105990:smartdocs-lambda-alerts \
+  --protocol email \
+  --notification-endpoint your@email.com \
+  --region us-east-1
+
+# List all subscriptions for a topic
+aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:347152105990:smartdocs-lambda-alerts \
+  --region us-east-1
+```
+
+Key concepts:
+- Topic = the channel. Publishers send to it, subscribers receive from it.
+- Subscription = a specific endpoint (email, Lambda, SQS) attached to a topic
+- `pending confirmation` = subscription exists but email not confirmed yet — no messages delivered until confirmed
+- A pending subscription can't be unsubscribed via CLI until confirmed — just re-subscribe with the correct email
+
+---
+
+## CloudWatch — Alarms
+
+CloudWatch collects metrics from every AWS service automatically. An alarm watches one metric and changes state when a threshold is crossed.
+
+Three states:
+- `OK` — metric is within threshold
+- `ALARM` — threshold breached, actions fire
+- `INSUFFICIENT_DATA` — not enough data points yet (normal for new alarms)
+
+```bash
+# Create an alarm — fires when Lambda errors >= 3 in a 5-minute window
+aws cloudwatch put-metric-alarm \
+  --alarm-name "smartdocs-lambda-errors" \
+  --metric-name Errors \
+  --namespace AWS/Lambda \
+  --dimensions Name=FunctionName,Value=smartdocs-generate-upload-url \
+  --period 300 \
+  --evaluation-periods 1 \
+  --threshold 3 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --statistic Sum \
+  --alarm-actions arn:aws:sns:us-east-1:347152105990:smartdocs-lambda-alerts \
+  --region us-east-1
+
+# Verify the alarm was created
+aws cloudwatch describe-alarms \
+  --alarm-names "smartdocs-lambda-errors" \
+  --region us-east-1
+```
+
+Key parameters explained:
+- `--namespace AWS/Lambda` — Lambda metrics live here, not just "Lambda"
+- `--period 300` — one data point = 5 minutes of aggregated errors
+- `--evaluation-periods 1` — alarm after 1 consecutive breaching period
+- `--statistic Sum` — add up all errors in the period (not average, not max)
+- `--comparison-operator GreaterThanOrEqualToThreshold` — fire at exactly 3, not just above 3
+- `--alarm-actions` — SNS topic ARN to notify when alarm fires
+
+Why `Sum` not `Average`? If you had 10 invocations and 3 errors, average = 0.3 which would never breach a threshold of 3. Sum = 3 which triggers correctly.

@@ -257,3 +257,100 @@ The HTTP handler (`generate-upload-url`) is triggered by API Gateway and returns
 5. Results saved to DynamoDB
 6. Client can query results via GET /documents/{doc_id}
 ```
+
+---
+
+## Input Validation Layer & Handler Architecture
+
+As a Lambda function grows beyond one or two actions, inline validation becomes messy. The cleaner pattern is to separate concerns into distinct layers.
+
+### The pattern
+
+```
+lambda_handler()        ← thin orchestrator: parse → validate → route → respond
+validate(body, action)  ← pure validation logic, returns list of ALL errors
+handle_*(body)          ← one function per action, returns plain dict (no response wrapping)
+response(status, body)  ← formats the API Gateway response
+```
+
+### Why return a list of errors instead of stopping at the first?
+
+If a request has 3 missing fields, the client should see all 3 at once — not fix one, resubmit, see the next. Same principle as form validation in a UI.
+
+```python
+def validate(body, action):
+    errors = []
+    if action == "count":
+        if not body.get("s3_key"):
+            errors.append("s3_key is required")
+        elif not body.get("s3_key").endswith(".txt"):
+            errors.append("s3_key must end with .txt")
+    return errors  # empty list = valid
+```
+
+### Action-based routing with a dict
+
+Instead of a chain of `if/elif` blocks, map action strings to handler functions:
+
+```python
+routes = {
+    "upload": handle_upload,
+    "count":  handle_count,
+    "get":    handle_get,
+    "list":   handle_list,
+}
+handler = routes.get(action)
+result = handler(body)
+return response(200, result)
+```
+
+Cleaner, easier to extend — adding a new action is one line in the dict.
+
+### Shared modules across Lambda functions
+
+If multiple Lambda functions need the same logic (validation, helpers), put it in a `shared/` folder:
+
+```
+functions/
+├── shared/
+│   └── validate.py     ← imported by any function that needs it
+├── generate-upload-url/
+│   └── handler.py
+└── s3-trigger/
+    └── handler.py
+```
+
+In Lambda, `/var/task/` is the root of your zip. Add the shared path before importing:
+
+```python
+import sys
+sys.path.append("/var/task/shared")
+from validate import validate
+```
+
+### Zipping with a shared folder
+
+The zip structure matters — Lambda runs whatever is at the root of the zip as `handler.py`:
+
+```bash
+# from smartdocs-ai/functions/
+zip -j generate-upload-url/function.zip generate-upload-url/handler.py  # -j strips path, lands at root
+zip generate-upload-url/function.zip shared/validate.py                  # keeps shared/ folder structure
+```
+
+Verify before deploying:
+```bash
+unzip -l function.zip
+# should show: handler.py at root, shared/validate.py with folder
+```
+
+### handle_list gotcha — default parameter
+
+If all handlers are called with `handler(body)` but `handle_list` needs no body, define it with a default:
+
+```python
+def handle_list(body=None):  # accepts body but ignores it
+    ...
+```
+
+This keeps the routing call consistent — no special-casing needed.

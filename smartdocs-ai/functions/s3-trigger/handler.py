@@ -30,22 +30,22 @@ def lambda_handler(event, context):
         obj = s3.get_object(Bucket=bucket, Key=key)
         text = obj["Body"].read().decode("utf-8")
         
-        # Step 4: calculate counts - same as before
-        count_words = len(text.split())
-        count_characters = len(text)
+        # Step 4: calculate counts
+        word_count = len(text.split())
+        char_count = len(text)
         
-        # Step 5: Save to DynamoDB
+        # Step 5: Save to DynamoDB — field names match the HTTP handler schema
         dynamodb.put_item(
             TableName=TABLE_NAME,
             Item={
                 "doc_id": {"S": key},
                 "s3_key": {"S": key},
-                "count_words": {"N": str(count_words)},
-                "count_characters": {"N": str(count_characters)},
+                "word_count": {"N": str(word_count)},
+                "char_count": {"N": str(char_count)},
                 "timestamp": {"S": datetime.utcnow().strftime("%Y/%m/%d")}
             }
         )
-        print(f"Processed {key}: {count_words} words, {count_characters} chars")
+        print(f"Processed {key}: {word_count} words, {char_count} chars")
         
     except Exception as e:
         print(f"Error processing {key}: {str(e)}")
